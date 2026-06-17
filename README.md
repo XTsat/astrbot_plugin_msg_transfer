@@ -78,13 +78,25 @@
 |--------------|------------------|
 | `mf add`     | 创建一则消息转发绑定的请求    |
 | `mf bind`    | 接受一则消息转发绑定的请求    |
+| `mf bindraw` | 直接创建转发绑定（例：#mf bindraw qq 654321 wx 123456） |
 | `mf del`     | 删除一条转发规则         |
-| `mf list`    | 列出与当前会话相关的所有转发规则 |
+| `mf list`    | 列出与当前会话相关的所有转发规则（可用于获取当前群号） |
 | `mf listall` | 列出所有转发规则         |
 | `mf hide`      | 切换规则的来源信息显示状态     |
 | `mf hidelist`    | 列出当前会话规则的来源信息状态 |
 | `mf hidelistall` | 列出所有规则的来源信息状态   |
 | `mf help`    | 显示该插件帮助信息        |
+
+### `mf bindraw` 平台简写映射
+| 简写 | 完整平台名 | 对应平台 |
+|------|-----------|---------|
+| `qq` | `aiocqhttp` | QQ |
+| `wx` | `wechatpadpro` | 微信 |
+| `tg` | `telegram` | Telegram |
+| `dc` | `discord` | Discord |
+
+> 用法示例：`#mf bindraw qq 654321 wx 123456` → 将 QQ 群 654321 的消息转发到微信 123456
+> 平台简写后加 `s` 表示私聊，如 `#mf bindraw qq 114514 wxs 123456` → 将 QQ 群 114514 转发给微信私聊 123456
 
 ---
 
@@ -137,11 +149,15 @@ astrbot/
 - 🔒 表示禁止显示来源信息
 
 ### **2. UMO（Unified Message Origin）**
-一个唯一标识会话的字符串，例如：
+一个唯一标识会话的字符串，格式为 `平台名:消息类型:会话ID`。消息类型有两种：
+- `GroupMessage` — 群聊
+- `FriendMessage` — 私聊
+
+示例：
 ```
-aiocqhttp:GroupMessage:654321
-wx:GroupMessage:123456
-your_name:FriendMessage:114514
+aiocqhttp:GroupMessage:654321       # QQ 群 654321
+wx:GroupMessage:123456              # 微信 123456
+your_name:FriendMessage:114514      # 私聊 114514
 ```
 
 UMO 能让插件知道“某条消息来自哪个平台的哪个会话”，确保转发到正确目标。

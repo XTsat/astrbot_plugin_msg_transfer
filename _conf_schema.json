@@ -8,7 +8,7 @@
   "rules": {
     "description": "转发规则",
     "type": "template_list",
-    "hint": "定义消息转发规则。每条规则指定消息来源和目标。UMO 格式：平台名:消息类型:会话ID，如 aiocqhttp:GroupMessage:654321",
+    "hint": "定义消息转发规则。每条规则指定消息来源和目标。UMO 格式：平台名:消息类型:会话ID，如 aiocqhttp:GroupMessage:654321 或 aiocqhttp:FriendMessage:114514",
     "default": [],
     "templates": {
       "rule": {
@@ -20,13 +20,13 @@
           "source_umo": {
             "description": "源 UMO",
             "type": "string",
-            "hint": "消息来源会话标识。例如 aiocqhttp:GroupMessage:654321",
+            "hint": "消息来源会话标识。GroupMessage（群聊）或 FriendMessage（私聊）。例如 aiocqhttp:GroupMessage:654321",
             "default": ""
           },
           "target_umo": {
             "description": "目标 UMO",
             "type": "string",
-            "hint": "消息目标会话标识。例如 wechatpadpro:GroupMessage:123456",
+            "hint": "消息目标会话标识。GroupMessage（群聊）或 FriendMessage（私聊）。例如 wechatpadpro:GroupMessage:123456",
             "default": ""
           },
           "hide_header": {

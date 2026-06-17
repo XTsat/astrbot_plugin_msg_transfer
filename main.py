@@ -10,7 +10,7 @@ from astrbot.api import AstrBotConfig
 
 import string
 
-from astrbot.core.message.components import BaseMessageComponent, Plain
+from astrbot.core.message.components import Plain
 
 
 # ------------------------
@@ -192,11 +192,55 @@ class MsgForward(star.Star):
                 "hide_header": hide_header,
             })
             self.config["rules"] = rules
+            self.config.save_config()
 
             idx = len(rules)
             yield event.plain_result(f"✅ 已绑定 #{idx}\n{source_umo} → {target_umo}")
         except Exception as e:
             yield event.plain_result(f"❌ 绑定失败：{e}")
+
+    @filter.permission_type(filter.PermissionType.ADMIN)
+    @mf.command("bindraw")
+    async def cmd_bindraw(self, event: AstrMessageEvent, args: str = ""):
+        """直接创建转发绑定（格式：#mf bindraw 平台 群号 平台 群号）"""
+        PLATFORM_MAP = {
+            "qq": "aiocqhttp",
+            "wx": "wechatpadpro",
+            "tg": "telegram",
+            "dc": "discord",
+        }
+
+        def build_umo(plat: str, uid: str) -> str:
+            plat_lower = plat.lower()
+            msg_type = "FriendMessage" if plat_lower.endswith("s") else "GroupMessage"
+            plat_key = plat_lower[:-1] if plat_lower.endswith("s") else plat_lower
+            platform = PLATFORM_MAP.get(plat_key, plat_key)
+            return f"{platform}:{msg_type}:{uid}"
+
+        try:
+            parts = (args or "").strip().split()
+            if len(parts) != 4:
+                yield event.plain_result("❌ 格式错误，用法：#mf bindraw 平台 群号 平台 群号\n例：#mf bindraw qq 654321 wx 123456")
+                return
+            src_plat, src_id, dst_plat, dst_id = parts
+            source_umo = build_umo(src_plat, src_id)
+            target_umo = build_umo(dst_plat, dst_id)
+            hide_header = self.config.get("default_hide_header", False)
+
+            rules = list(self.config.get("rules", []))
+            rules.append({
+                "__template_key": "rule",
+                "source_umo": source_umo,
+                "target_umo": target_umo,
+                "hide_header": hide_header,
+            })
+            self.config["rules"] = rules
+            self.config.save_config()
+
+            idx = len(rules)
+            yield event.plain_result(f"✅ 已绑定 #{idx}\n{source_umo} → {target_umo}")
+        except Exception as e:
+            yield event.plain_result(f"❌ 直接绑定失败：{e}")
 
     @filter.permission_type(filter.PermissionType.ADMIN)
     @mf.command("del")
@@ -210,6 +254,7 @@ class MsgForward(star.Star):
                 return
             removed = rules.pop(idx)
             self.config["rules"] = rules
+            self.config.save_config()
             yield event.plain_result(
                 f"🗑️ 已删除规则 #{rid}\n{removed.get('source_umo')} → {removed.get('target_umo')}"
             )
@@ -223,7 +268,7 @@ class MsgForward(star.Star):
         rules = self.config.get("rules", [])
         matched = [(idx, r) for idx, r in enumerate(rules, start=1) if r.get("source_umo") == source_umo]
         if not matched:
-            yield event.plain_result("📭 当前会话没有规则")
+            yield event.plain_result(f"📭 当前会话 {source_umo} 没有规则")
             return
 
         lines = [f"📜 当前会话({source_umo}) 的规则："]
@@ -246,6 +291,7 @@ class MsgForward(star.Star):
             current = rules[idx].get("hide_header", False)
             rules[idx]["hide_header"] = not current
             self.config["rules"] = rules
+            self.config.save_config()
 
             status = "隐藏" if not current else "显示"
             yield event.plain_result(f"✅ 规则 #{rid} 来源信息已{status}")
@@ -346,7 +392,7 @@ class MsgForward(star.Star):
                     else:
                         header = self._format_origin_header(event, source_umo)
                         header += "\n\n\u200b"
-                        new_chain = list[BaseMessageComponent]([Plain(text=header)]) + message_chain
+                        new_chain = [Plain(text=header)] + message_chain
                     await self.context.send_message(target, event.chain_result(new_chain))
                 except ValueError as e:
                     logger.error(f"❌ 不合法的 session 字符串，转发失败: {e}")
