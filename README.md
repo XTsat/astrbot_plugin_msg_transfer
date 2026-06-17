@@ -6,6 +6,7 @@
 
 > **许可证：AGPL-3.0**  
 > 本插件在 AstrBot（AGPL）基础上开发，因此以 AGPL 开源。
+> 本插件基于 [Siaospeed/astrbot_plugin_msg_transfer](https://github.com/Siaospeed/astrbot_plugin_msg_transfer) 修改而来，添加了WebUI配置, 支持对转发规则设置来源信息显示状态。
 
 ---
 
@@ -13,19 +14,19 @@
 
 - **多平台互通**：支持 AstrBot 的任意平台适配器。
 - **消息来源标注**：支持自动在消息前增加来源信息（例如 UMO / 平台名 / 发送者）。
-- **来源信息控制**：支持对转发规则设置来源信息显示状态，允许显示或禁止显示来源信息。
 - **可持久化存储**：自动保存转发规则，不会因重启丢失。
 - **可拓展性高**：所有逻辑模块化，便于二次开发。
+
+额外功能：
+- **WebUI配置**：支持通过 AstrBot WebUI 进行可视化配置，无需了解配置格式。
+- **单命令配置**：支持通过单命令单窗口配置转发规则，无需 WebUI 或手动绑定。
+- **来源信息控制**：支持对转发规则设置来源信息显示状态，允许显示或禁止显示来源信息，支持自定义来源信息显示模板。
 
 ---
 
 ## 🚀 快速开始
 1. **下载插件**：通过 AstrBot 的插件市场直接下载，或从本仓库的 Release 下载 `astrbot_plugin_msg_forward_cc` 的 `.zip` 文件，在 AstrBot WebUI 中的插件页面中选择 `从文件安装` 。
-2. **安装依赖**：AstrBot 会在 bot 重启时自动安装所需依赖。如确有手动安装依赖之需求，可执行以下命令
-    ```bash
-    pip install -r requirements.txt
-    ```
-3. **重启 AstrBot**：我们推荐在安装本插件后手动重启一次 AstrBot。
+2. **重启 AstrBot**：我们推荐在安装本插件后手动重启一次 AstrBot。
 
 ---
 

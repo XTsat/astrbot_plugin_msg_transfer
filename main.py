@@ -162,6 +162,24 @@ class MsgForward(star.Star):
         """mf 命令组"""
         pass
 
+    @mf.command("help")
+    async def cmd_help(self, event: AstrMessageEvent):
+        """显示帮助信息"""
+        yield event.plain_result(
+            "📋 MsgForward 帮助\n\n"
+            "#mf add           创建一则转发绑定请求\n"
+            "#mf bind <绑定码>     接受一则转发绑定请求\n"
+            "#mf bindraw <源平台> <源ID> <目标平台> <目标ID>\n"
+            "                  直接创建转发绑定，平台简写：qq/wx/tg/dc，加s为私聊\n"
+            "#mf del <编号>    删除一条转发规则\n"
+            "#mf list          列出当前会话的转发规则（含群号）\n"
+            "#mf listall       列出所有转发规则\n"
+            "#mf hide <编号>   切换规则来源信息显示/隐藏\n"
+            "#mf hidelist      列出当前会话规则的来源信息状态\n"
+            "#mf hidelistall   列出所有规则的来源信息状态\n"
+            "#mf help          显示此帮助"
+        )
+
     @filter.permission_type(filter.PermissionType.ADMIN)
     @mf.command("add")
     async def cmd_add(self, event: AstrMessageEvent):
