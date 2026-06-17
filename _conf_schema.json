@@ -2,7 +2,7 @@
   "default_hide_header": {
     "description": "新建转发规则时，默认是否隐藏来源信息头。",
     "type": "bool",
-    "hint": "开启后，通过 mt bind 新建的规则默认不显示来源信息。可通过 mt hide 随时切换。",
+    "hint": "开启后，通过 mf bind 新建的规则默认不显示来源信息。可通过 mf hide 随时切换。",
     "default": false
   },
   "rules": {

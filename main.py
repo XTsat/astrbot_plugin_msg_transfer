@@ -1,5 +1,4 @@
 import json
-import os
 import secrets
 from pathlib import Path
 
@@ -64,62 +63,14 @@ def gen_code(n=6):
 # ------------------------
 # 存储层（无锁简化）
 # ------------------------
-class MsgTransferStore:
-    def __init__(self, rule_file: Path, pending_file: Path):
-        self.rule_file = rule_file
+class MsgForwardStore:
+    def __init__(self, pending_file: Path):
         self.pending_file = pending_file
         self._ensure_files()
 
     def _ensure_files(self):
-        if not self.rule_file.exists():
-            self.rule_file.write_text("{}", encoding="utf-8")
         if not self.pending_file.exists():
             self.pending_file.write_text("{}", encoding="utf-8")
-
-    # ----- rules -----
-    def load_rules(self):
-        return load_json(self.rule_file)
-
-    def save_rules(self, data: dict):
-        save_json(self.rule_file, data)
-
-    def add_rule(self, source_umo: str, target_umo: str, hide_header: bool = False) -> str:
-        data = self.load_rules()
-
-        # 查重
-        for rid, rule in data.items():
-            if rule["source_umo"] == source_umo and rule["target_umo"] == target_umo:
-                raise ValueError(f"规则已存在 #{rid}")
-
-        new_id = str(max(map(int, data.keys()), default=0) + 1)
-        data[new_id] = {
-            "source_umo": source_umo,
-            "target_umo": target_umo,
-            "hide_header": hide_header
-        }
-        self.save_rules(data)
-        return new_id
-
-    def delete_rule(self, rid: str):
-        data = self.load_rules()
-        if rid not in data:
-            raise KeyError("规则不存在")
-        data.pop(rid)
-        self.save_rules(data)
-
-    def set_hide_header(self, rid: str, hide: bool):
-        data = self.load_rules()
-        if rid not in data:
-            raise KeyError("规则不存在")
-        data[rid]["hide_header"] = hide
-        self.save_rules(data)
-
-    def list_rules(self, source_umo):
-        data = self.load_rules()
-        return {rid: r for rid, r in data.items() if r["source_umo"] == source_umo}
-
-    def list_all_rules(self):
-        return self.load_rules()
 
     # ----- pending -----
     def load_pending(self):
@@ -145,53 +96,15 @@ class MsgTransferStore:
 # ------------------------
 # 插件主体
 # ------------------------
-class MsgTransfer(star.Star):
+class MsgForward(star.Star):
     def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
         self.config = config or {}
 
-        # 使用 AstrBot 提供的标准方法获取项目持久化数据存储目录
-        self.data_dir = star.StarTools.get_data_dir("msg_transfer")
-        self.rule_file = self.data_dir / "rules.json"
+        self.data_dir = star.StarTools.get_data_dir("msg_forward_cc")
         self.pending_file = self.data_dir / "pending.json"
 
-        self.store = MsgTransferStore(self.rule_file, self.pending_file)
-
-        self._migrate_store_to_config()
-
-    def _migrate_store_to_config(self):
-        """首次启动时，将 store 中的旧规则迁移到 config 的 rules 列表中。"""
-        rules = self.config.get("rules", [])
-
-        # 已有 config 规则，跳过迁移
-        if rules:
-            return
-
-        # 从 store 迁移
-        store_rules = self.store.load_rules()
-        if store_rules:
-            migrated = []
-            for rid in sorted(store_rules.keys(), key=int):
-                r = store_rules[rid]
-                migrated.append({
-                    "__template_key": "rule",
-                    "source_umo": r.get("source_umo", ""),
-                    "target_umo": r.get("target_umo", ""),
-                    "hide_header": r.get("hide_header", False),
-                })
-            self.config["rules"] = migrated
-            logger.info(f"已从 store 迁移 {len(migrated)} 条规则到 config")
-
-    def _sync_config_to_store(self):
-        """将 config 中的 rules 同步回 store（保持向后兼容）。"""
-        data = {}
-        for idx, rule in enumerate(self.config.get("rules", []), start=1):
-            data[str(idx)] = {
-                "source_umo": rule.get("source_umo", ""),
-                "target_umo": rule.get("target_umo", ""),
-                "hide_header": rule.get("hide_header", False),
-            }
-        self.store.save_rules(data)
+        self.store = MsgForwardStore(self.pending_file)
 
     def _format_origin_header(self, event: AstrMessageEvent, umo: str) -> str:
         try:
@@ -242,15 +155,15 @@ class MsgTransfer(star.Star):
         return header
 
     async def initialize(self):
-        logger.info("MsgTransfer plugin init OK")
+        logger.info("MsgForward plugin init OK")
 
-    @filter.command_group("mt")
-    def mt(self):
-        """mt 命令组"""
+    @filter.command_group("mf")
+    def mf(self):
+        """mf 命令组"""
         pass
 
     @filter.permission_type(filter.PermissionType.ADMIN)
-    @mt.command("add")
+    @mf.command("add")
     async def cmd_add(self, event: AstrMessageEvent):
         """创建一则消息转发绑定的请求"""
         code = gen_code()
@@ -259,11 +172,11 @@ class MsgTransfer(star.Star):
 
         yield event.plain_result(
             f"📌 已创建绑定请求\n"
-            f"请在目标会话执行：#mt bind {code}"
+            f"请在目标会话执行：#mf bind {code}"
         )
 
     @filter.permission_type(filter.PermissionType.ADMIN)
-    @mt.command("bind")
+    @mf.command("bind")
     async def cmd_bind(self, event: AstrMessageEvent, code: str):
         """接受一则消息转发绑定的请求"""
         try:
@@ -280,16 +193,15 @@ class MsgTransfer(star.Star):
             })
             self.config["rules"] = rules
 
-            self._sync_config_to_store()
             idx = len(rules)
             yield event.plain_result(f"✅ 已绑定 #{idx}\n{source_umo} → {target_umo}")
         except Exception as e:
             yield event.plain_result(f"❌ 绑定失败：{e}")
 
     @filter.permission_type(filter.PermissionType.ADMIN)
-    @mt.command("del")
+    @mf.command("del")
     async def cmd_del(self, event: AstrMessageEvent, rid: str):
-        """删除一条转发规则（规则编号从 #mt list 查看）"""
+        """删除一条转发规则（规则编号从 #mf list 查看）"""
         try:
             rules = list(self.config.get("rules", []))
             idx = int(rid) - 1
@@ -298,14 +210,13 @@ class MsgTransfer(star.Star):
                 return
             removed = rules.pop(idx)
             self.config["rules"] = rules
-            self._sync_config_to_store()
             yield event.plain_result(
                 f"🗑️ 已删除规则 #{rid}\n{removed.get('source_umo')} → {removed.get('target_umo')}"
             )
         except Exception as e:
             yield event.plain_result(f"❌ 删除失败: {e}")
 
-    @mt.command("list")
+    @mf.command("list")
     async def cmd_list(self, event: AstrMessageEvent):
         """列出与当前会话相关的所有转发规则"""
         source_umo = str(event.unified_msg_origin)
@@ -322,7 +233,7 @@ class MsgTransfer(star.Star):
         yield event.plain_result("\n".join(lines))
 
     @filter.permission_type(filter.PermissionType.ADMIN)
-    @mt.command("hide")
+    @mf.command("hide")
     async def cmd_hide_header(self, event: AstrMessageEvent, rid: str):
         """切换规则的来源信息显示状态（隐藏/显示）"""
         try:
@@ -335,16 +246,44 @@ class MsgTransfer(star.Star):
             current = rules[idx].get("hide_header", False)
             rules[idx]["hide_header"] = not current
             self.config["rules"] = rules
-            self._sync_config_to_store()
 
             status = "隐藏" if not current else "显示"
             yield event.plain_result(f"✅ 规则 #{rid} 来源信息已{status}")
         except Exception as e:
             yield event.plain_result(f"❌ 操作失败：{e}")
 
-    @filter.permission_type(filter.PermissionType.ADMIN)
-    @mt.command("hidelist")
+    @mf.command("hidelist")
     async def cmd_header_status(self, event: AstrMessageEvent):
+        """列出当前会话规则的来源信息显示状态（允许：显示来源，禁止：隐藏来源）"""
+        source_umo = str(event.unified_msg_origin)
+        rules = self.config.get("rules", [])
+        matched = [(idx, r) for idx, r in enumerate(rules, start=1) if r.get("source_umo") == source_umo]
+        if not matched:
+            yield event.plain_result("📭 当前会话没有规则")
+            return
+
+        allowed = []
+        blocked = []
+
+        for idx, r in matched:
+            if r.get("hide_header", False):
+                blocked.append(f"#{idx} {r['source_umo']} → {r['target_umo']}")
+            else:
+                allowed.append(f"#{idx} {r['source_umo']} → {r['target_umo']}")
+
+        lines = [f"📋 当前会话({source_umo}) 来源信息状态："]
+        if allowed:
+            lines.append("\n✅ 允许显示来源：")
+            lines.extend(allowed)
+        if blocked:
+            lines.append("\n🔒 禁止显示来源：")
+            lines.extend(blocked)
+
+        yield event.plain_result("\n".join(lines))
+
+    @filter.permission_type(filter.PermissionType.ADMIN)
+    @mf.command("hidelistall")
+    async def cmd_header_status_all(self, event: AstrMessageEvent):
         """查看所有规则的来源信息显示状态（允许：显示来源，禁止：隐藏来源）"""
         rules = self.config.get("rules", [])
         if not rules:
@@ -360,7 +299,7 @@ class MsgTransfer(star.Star):
             else:
                 allowed.append(f"#{idx} {r['source_umo']} → {r['target_umo']}")
 
-        lines = ["📋 规则来源信息状态列表："]
+        lines = ["📋 所有规则来源信息状态："]
         if allowed:
             lines.append("\n✅ 允许显示来源：")
             lines.extend(allowed)
@@ -370,7 +309,7 @@ class MsgTransfer(star.Star):
 
         yield event.plain_result("\n".join(lines))
 
-    @mt.command("listall")
+    @mf.command("listall")
     async def cmd_list_all(self, event: AstrMessageEvent):
         """列出所有转发规则"""
         rules = self.config.get("rules", [])
@@ -418,4 +357,4 @@ class MsgTransfer(star.Star):
             logger.error(f"❌ 转发逻辑异常: {e}")
 
     async def terminate(self):
-        logger.info("MsgTransfer plugin terminated")
+        logger.info("MsgForward plugin terminated")
