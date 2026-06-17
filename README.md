@@ -31,7 +31,36 @@
 
 ## ⚙️ 配置
 
-目前插件暂无需额外配置，所有规则通过命令创建。
+插件支持通过 AstrBot WebUI 进行可视化配置，配置项定义在 `_conf_schema.json` 中。
+
+| 配置项 | 类型 | 默认值 | 说明 |
+|-------|------|--------|------|
+| `default_hide_header` | bool | `false` | 新建规则时默认是否隐藏来源信息头 |
+| `platform_name_map` | object | 见下方 | 自定义各平台在来源信息中的显示名称 |
+| `header_template` | text | 见下方 | 来源信息头模板，支持变量替换 |
+
+### `platform_name_map` 默认值
+```json
+{
+  "aiocqhttp": "QQ",
+  "wechatpadpro": "微信",
+  "telegram": "Telegram",
+  "discord": "Discord"
+}
+```
+
+### `header_template` 可用变量
+- `{sender_name}` — 发送者昵称
+- `{sender_id}` — 发送者 ID
+- `{platform}` — 平台名称
+- `{msg_type}` — 消息类型（群组/私聊/未知类型）
+- `{conversation_id}` — 会话 ID
+
+默认模板：
+```
+[转发] {sender_name} ({sender_id})
+来自 {platform} 的 {msg_type}（ID: {conversation_id}）消息
+```
 
 ---
 
@@ -58,6 +87,7 @@ astrbot/
       └─ astrbot_plugin_msg_transfer/
          ├─ LICENSE
          ├─ logo.png
+         ├─ _conf_schema.json
          ├─ main.py
          ├─ metadata.yaml
          ├─ README.md

@@ -7,6 +7,7 @@ import astrbot.api.star as star
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star
 from astrbot.api import logger
+from astrbot.api import AstrBotConfig
 
 import string
 
@@ -178,14 +179,64 @@ class MsgTransferStore:
 # 插件主体
 # ------------------------
 class MsgTransfer(star.Star):
-    def __init__(self, context: Context):
+    def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
+        self.config = config or {}
+
         # 使用 AstrBot 提供的标准方法获取项目持久化数据存储目录
         self.data_dir = star.StarTools.get_data_dir("msg_transfer")
         self.rule_file = self.data_dir / "rules.json"
         self.pending_file = self.data_dir / "pending.json"
 
         self.store = MsgTransferStore(self.rule_file, self.pending_file)
+
+    def _format_origin_header(self, event: AstrMessageEvent, umo: str) -> str:
+        try:
+            _, msg_type, conversation_id = umo.split(":", 2)
+        except ValueError:
+            msg_type = "Unknown"
+            conversation_id = "Unknown"
+
+        source_platform = event.get_platform_name()
+        sender_name = event.get_sender_name()
+        sender_id = event.get_sender_id()
+
+        # 平台友好名称（从配置读取，合并默认值）
+        default_map = {
+            "aiocqhttp": "QQ",
+            "wechatpadpro": "微信",
+            "telegram": "Telegram",
+            "discord": "Discord",
+        }
+        platform_map = self.config.get("platform_name_map", {}) or {}
+        default_map.update(platform_map)
+        source_platform_human = default_map.get(source_platform, source_platform)
+
+        # 消息类型友好名称
+        if msg_type == "GroupMessage":
+            msg_type_human = "群组"
+        elif msg_type == "FriendMessage":
+            msg_type_human = "私聊"
+        else:
+            msg_type_human = "未知类型"
+
+        # 使用配置中的模板
+        template = self.config.get("header_template", "").strip()
+        if template:
+            header = template.format(
+                sender_name=sender_name,
+                sender_id=sender_id,
+                platform=source_platform_human,
+                msg_type=msg_type_human,
+                conversation_id=conversation_id,
+            )
+        else:
+            header = (
+                f"[转发] {sender_name} ({sender_id})\n"
+                f"来自 {source_platform_human} 的 {msg_type_human}（ID: {conversation_id}）消息"
+            )
+
+        return header
 
     async def initialize(self):
         logger.info("MsgTransfer plugin init OK")
@@ -215,7 +266,8 @@ class MsgTransfer(star.Star):
         try:
             target_umo = str(event.unified_msg_origin)
             source_umo = self.store.pop_pending(code)
-            rid = self.store.add_rule(source_umo, target_umo)
+            hide_header = self.config.get("default_hide_header", False)
+            rid = self.store.add_rule(source_umo, target_umo, hide_header)
             yield event.plain_result(f"✅ 已绑定 #{rid}\n{source_umo} → {target_umo}")
         except Exception as e:
             yield event.plain_result(f"❌ 绑定失败：{e}")
@@ -307,7 +359,7 @@ class MsgTransfer(star.Star):
                     if rule.get("hide_header", False):
                         new_chain = message_chain
                     else:
-                        header = format_origin_header(event, source_umo)
+                        header = self._format_origin_header(event, source_umo)
                         header += "\n\n\u200b"
                         new_chain = list[BaseMessageComponent]([Plain(text=header)]) + message_chain
                     await self.context.send_message(target, event.chain_result(new_chain))

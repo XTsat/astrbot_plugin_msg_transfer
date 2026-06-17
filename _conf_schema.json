@@ -1,0 +1,47 @@
+{
+  "default_hide_header": {
+    "description": "新建转发规则时，默认是否隐藏来源信息头。",
+    "type": "bool",
+    "hint": "开启后，通过 mt bind 新建的规则默认不显示来源信息。可通过 mt hide 随时切换。",
+    "default": false
+  },
+  "platform_name_map": {
+    "description": "平台名称映射（自定义各平台在来源信息中的显示名称）。",
+    "type": "object",
+    "hint": "可自定义各平台在来源信息中的友好名称，留空的平台使用默认名称。",
+    "default": {
+      "aiocqhttp": "QQ",
+      "wechatpadpro": "微信",
+      "telegram": "Telegram",
+      "discord": "Discord"
+    },
+    "items": {
+      "aiocqhttp": {
+        "description": "aiocqhttp（QQ）平台显示名称",
+        "type": "string",
+        "default": "QQ"
+      },
+      "wechatpadpro": {
+        "description": "微信平台显示名称",
+        "type": "string",
+        "default": "微信"
+      },
+      "telegram": {
+        "description": "Telegram 平台显示名称",
+        "type": "string",
+        "default": "Telegram"
+      },
+      "discord": {
+        "description": "Discord 平台显示名称",
+        "type": "string",
+        "default": "Discord"
+      }
+    }
+  },
+  "header_template": {
+    "description": "来源信息头模板。可用变量：{sender_name} 发送者昵称、{sender_id} 发送者ID、{platform} 平台名、{msg_type} 消息类型、{conversation_id} 会话ID。",
+    "type": "text",
+    "hint": "自定义转发消息前缀格式，留空则使用默认格式。注意：消息头末尾会自动追加换行。",
+    "default": "[转发] {sender_name} ({sender_id})\n来自 {platform} 的 {msg_type}（ID: {conversation_id}）消息"
+  }
+}
